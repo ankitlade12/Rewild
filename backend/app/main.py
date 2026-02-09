@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from app.routes.lookup import router as lookup_router
+from app.routes.simulate import router as simulate_router
 
 load_dotenv()
 
@@ -26,3 +27,4 @@ async def health():
     return {"status": "ok", "service": "rewild-api"}
 
 app.include_router(lookup_router)
+app.include_router(simulate_router)
