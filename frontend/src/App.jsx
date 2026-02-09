@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import SiteProfileWizard from './SiteProfileWizard'
 import InterventionPanel from './InterventionPanel'
+import Dashboard from './Dashboard'
 import './App.css'
 
 function App() {
@@ -12,10 +13,24 @@ function App() {
     setScreen('interventions')
   }
 
+  const handleRunSimulation = (selectedInterventions) => {
+    setProfile(prev => ({ ...prev, selectedInterventions }))
+    setScreen('dashboard')
+  }
+
+  const handleBack = (target) => {
+    if (target === 'wizard') {
+      setScreen('wizard')
+      setProfile(null)
+    } else if (target === 'interventions') {
+      setScreen('interventions')
+    }
+  }
+
   return (
     <div className="app">
       <nav className="navbar glass">
-        <div className="nav-brand" onClick={() => { setScreen('wizard'); setProfile(null) }}>
+        <div className="nav-brand" onClick={() => handleBack('wizard')}>
           <span className="brand-icon">🌿</span>
           <span className="brand-text">REWILD</span>
         </div>
@@ -26,7 +41,17 @@ function App() {
           <SiteProfileWizard onComplete={handleWizardComplete} />
         )}
         {screen === 'interventions' && profile && (
-          <InterventionPanel profile={profile} onBack={() => setScreen('wizard')} />
+          <InterventionPanel
+            profile={profile}
+            onBack={() => handleBack('wizard')}
+            onRunSimulation={handleRunSimulation}
+          />
+        )}
+        {screen === 'dashboard' && profile && (
+          <Dashboard
+            profile={profile}
+            onBack={() => handleBack('interventions')}
+          />
         )}
       </main>
     </div>

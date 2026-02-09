@@ -9,7 +9,7 @@ const EFFORT_COLORS = {
     'High': '#f97316',
 }
 
-export default function InterventionPanel({ profile, onBack }) {
+export default function InterventionPanel({ profile, onBack, onRunSimulation }) {
     const [interventions, setInterventions] = useState([])
     const [selected, setSelected] = useState([])
     const [plants, setPlants] = useState([])
@@ -121,7 +121,7 @@ export default function InterventionPanel({ profile, onBack }) {
                                     </div>
                                 ))}
                             </div>
-                            <button className="btn-primary" style={{ width: '100%', marginTop: 16 }}>
+                            <button className="btn-primary" style={{ width: '100%', marginTop: 16 }} onClick={() => onRunSimulation(selected)}>
                                 Run Scenario Engine →
                             </button>
                         </div>
