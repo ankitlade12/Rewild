@@ -1,19 +1,19 @@
 # STATE.md — Session Memory
 
 > **Last Updated**: 2026-02-09
-> **Current Phase**: Phase 1 — Foundation & Data Layer
+> **Current Phase**: Phase 2 — Scenario Engine
 > **Status**: ✅ Complete
 
 ## Current Position
-- **Phase**: 1 (completed)
+- **Phase**: 2 (completed)
 - **Task**: All tasks complete
 - **Status**: Verified
 
 ## Next Steps
-1. /plan 2
+1. /plan 3
 
 ## Last Session
-- Executed Phase 1: 3 plans across 2 waves
-- Data layer: 4 modules (zones, ecoregions, plants, pollinators)
-- API: 4 endpoints verified
-- Frontend: wizard + intervention panel, build clean
+- Executed Phase 2: scenario engine with 6 modules
+- Succession model, bloom calendar, food web builder
+- OpenAI integration with fallback, uncertainty bands
+- POST /api/simulate endpoint verified
