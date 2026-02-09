@@ -1,34 +1,35 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import SiteProfileWizard from './SiteProfileWizard'
+import InterventionPanel from './InterventionPanel'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [screen, setScreen] = useState('wizard')
+  const [profile, setProfile] = useState(null)
+
+  const handleWizardComplete = (profileData) => {
+    setProfile(profileData)
+    setScreen('interventions')
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="app">
+      <nav className="navbar glass">
+        <div className="nav-brand" onClick={() => { setScreen('wizard'); setProfile(null) }}>
+          <span className="brand-icon">🌿</span>
+          <span className="brand-text">REWILD</span>
+        </div>
+        <span className="nav-tagline">Ecological Scenario Engine</span>
+      </nav>
+      <main className="main-content">
+        {screen === 'wizard' && (
+          <SiteProfileWizard onComplete={handleWizardComplete} />
+        )}
+        {screen === 'interventions' && profile && (
+          <InterventionPanel profile={profile} onBack={() => setScreen('wizard')} />
+        )}
+      </main>
+    </div>
   )
 }
 
