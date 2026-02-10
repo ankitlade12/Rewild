@@ -1,13 +1,11 @@
 import { useRef, useEffect, useState } from 'react'
-import * as d3 from 'd3'
 
 export default function FoodWebGraph({ foodWeb, year: initialYear }) {
-    const svgRef = useRef(null)
+    const canvasRef = useRef(null)
     const [year, setYear] = useState(initialYear || 0)
     const [isPlaying, setIsPlaying] = useState(false)
     const timerRef = useRef(null)
 
-    // Auto-play animation
     useEffect(() => {
         if (isPlaying) {
             timerRef.current = setInterval(() => {
@@ -21,122 +19,123 @@ export default function FoodWebGraph({ foodWeb, year: initialYear }) {
     }, [isPlaying])
 
     useEffect(() => {
-        if (!foodWeb || !svgRef.current) return
+        if (!foodWeb || !canvasRef.current) return
         const data = foodWeb[year]
         if (!data) return
 
-        const svg = d3.select(svgRef.current)
-        const width = svgRef.current.clientWidth || 600
-        const height = 420
-
-        svg.selectAll('*').remove()
-        svg.attr('viewBox', `0 0 ${width} ${height}`)
+        const canvas = canvasRef.current
+        const ctx = canvas.getContext('2d')
+        const dpr = window.devicePixelRatio || 1
+        const w = canvas.clientWidth
+        const h = 400
+        canvas.width = w * dpr
+        canvas.height = h * dpr
+        ctx.scale(dpr, dpr)
+        ctx.clearRect(0, 0, w, h)
 
         if (data.nodes.length === 0) {
-            svg.append('text')
-                .attr('x', width / 2).attr('y', height / 2)
-                .attr('text-anchor', 'middle')
-                .attr('fill', '#64748b')
-                .attr('font-size', '14px')
-                .text('Year 0: Starting point — no established food web yet')
+            ctx.fillStyle = '#64748b'
+            ctx.font = '14px Inter, sans-serif'
+            ctx.textAlign = 'center'
+            ctx.fillText('Year 0: Starting point — no established food web yet', w / 2, h / 2)
             return
         }
 
         const TYPE_COLORS = {
-            plant: '#22c55e',
-            bee: '#fbbf24',
-            butterfly: '#fb7185',
-            moth: '#c084fc',
-            hummingbird: '#f43f5e',
-            fly: '#94a3b8',
-            wasp: '#f97316',
-            beetle: '#a78bfa',
-            bird: '#38bdf8',
+            plant: '#22c55e', bee: '#fbbf24', butterfly: '#fb7185',
+            moth: '#c084fc', hummingbird: '#f43f5e', fly: '#94a3b8',
+            wasp: '#f97316', beetle: '#a78bfa', bird: '#38bdf8',
         }
 
-        // Trophic layers spread vertically
-        const GROUP_Y = {
-            producer: height * 0.8,
-            consumer: height * 0.45,
-            top_consumer: height * 0.15,
+        // Separate into trophic layers
+        const plants = data.nodes.filter(n => n.group === 'producer')
+        const pollinators = data.nodes.filter(n => n.group === 'consumer')
+        const birds = data.nodes.filter(n => n.group === 'top_consumer')
+
+        // Position nodes in clean rows
+        const padding = 50
+        const usableW = w - padding * 2
+
+        const positionRow = (items, rowY) => {
+            const gap = items.length > 1 ? usableW / (items.length - 1) : 0
+            const startX = items.length > 1 ? padding : w / 2
+            items.forEach((item, i) => {
+                item._x = startX + i * gap
+                item._y = rowY
+            })
         }
 
-        // Deep-clone nodes and edges so D3 doesn't mutate React state
-        const nodes = data.nodes.map(n => ({ ...n }))
-        const edges = data.edges.map(e => ({ ...e }))
+        positionRow(birds, 60)
+        positionRow(pollinators, h / 2)
+        positionRow(plants, h - 60)
 
-        // Create force simulation with strong repulsion
-        const simulation = d3.forceSimulation(nodes)
-            .force('link', d3.forceLink(edges).id(d => d.id).distance(100).strength(0.15))
-            .force('charge', d3.forceManyBody().strength(-200))
-            .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('y', d3.forceY(d => GROUP_Y[d.group] || height / 2).strength(0.4))
-            .force('x', d3.forceX(width / 2).strength(0.05))
-            .force('collision', d3.forceCollide().radius(d => (d.size || 6) + 12))
+        // Build position map
+        const posMap = {}
+        data.nodes.forEach(n => { posMap[n.id] = n })
 
-        // Run simulation synchronously for stability
-        simulation.alpha(1).alphaDecay(0.02)
-        for (let i = 0; i < 200; i++) simulation.tick()
-        simulation.stop()
+        // Draw edges as curved lines
+        data.edges.forEach(edge => {
+            const src = posMap[typeof edge.source === 'object' ? edge.source.id : edge.source]
+            const tgt = posMap[typeof edge.target === 'object' ? edge.target.id : edge.target]
+            if (!src || !tgt || src._x == null || tgt._x == null) return
 
-        // Clamp positions
-        nodes.forEach(d => {
-            d.x = Math.max(40, Math.min(width - 40, d.x))
-            d.y = Math.max(20, Math.min(height - 20, d.y))
+            ctx.beginPath()
+            const midY = (src._y + tgt._y) / 2
+            const cpxOffset = (Math.random() - 0.5) * 30
+            ctx.moveTo(src._x, src._y)
+            ctx.quadraticCurveTo(
+                (src._x + tgt._x) / 2 + cpxOffset,
+                midY,
+                tgt._x, tgt._y
+            )
+            ctx.strokeStyle = edge.type === 'pollination'
+                ? 'rgba(34,197,94,0.12)'
+                : 'rgba(56,189,248,0.10)'
+            ctx.lineWidth = 1
+            ctx.stroke()
         })
 
-        // Draw links with gradient
-        svg.append('g')
-            .selectAll('line')
-            .data(edges)
-            .enter().append('line')
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y)
-            .attr('stroke', d => d.type === 'pollination' ? 'rgba(34,197,94,0.2)' : 'rgba(56,189,248,0.15)')
-            .attr('stroke-width', 1)
-            .attr('opacity', 0)
-            .transition().duration(400)
-            .attr('opacity', 1)
-
         // Draw nodes
-        svg.append('g')
-            .selectAll('circle')
-            .data(nodes)
-            .enter().append('circle')
-            .attr('cx', d => d.x)
-            .attr('cy', d => d.y)
-            .attr('r', 0)
-            .attr('fill', d => TYPE_COLORS[d.type] || '#64748b')
-            .attr('stroke', d => d.conservation === 'declining' || d.conservation === 'vulnerable'
-                ? '#f43f5e' : 'rgba(255,255,255,0.15)')
-            .attr('stroke-width', d => d.conservation === 'declining' ? 2.5 : 1)
-            .attr('filter', 'drop-shadow(0 0 3px rgba(0,0,0,0.3))')
-            .transition().duration(500).delay((d, i) => i * 20)
-            .attr('r', d => d.size || 5)
+        data.nodes.forEach(n => {
+            if (n._x == null) return
+            const r = Math.min(n.size || 5, 10)
+            ctx.beginPath()
+            ctx.arc(n._x, n._y, r, 0, Math.PI * 2)
+            ctx.fillStyle = TYPE_COLORS[n.type] || '#64748b'
+            ctx.fill()
 
-        // Labels: only show for top ~10 biggest nodes to avoid clutter
-        const sortedNodes = [...nodes].sort((a, b) => (b.size || 5) - (a.size || 5))
-        const labelNodes = sortedNodes.slice(0, Math.min(10, nodes.length))
+            if (n.conservation === 'declining' || n.conservation === 'vulnerable') {
+                ctx.strokeStyle = '#f43f5e'
+                ctx.lineWidth = 2
+                ctx.stroke()
+            }
+        })
 
-        svg.append('g')
-            .selectAll('text')
-            .data(labelNodes)
-            .enter().append('text')
-            .text(d => {
-                const name = d.label || d.id
-                return name.length > 12 ? name.slice(0, 11) + '…' : name
+        // Labels: row headers
+        ctx.fillStyle = '#475569'
+        ctx.font = 'bold 10px Inter, sans-serif'
+        ctx.textAlign = 'left'
+        ctx.fillText('🐦 BIRDS', 8, 30)
+        ctx.fillText('🐝 POLLINATORS', 8, h / 2 - 25)
+        ctx.fillText('🌿 PLANTS', 8, h - 25)
+
+        // Labels: top 4 per row
+        ctx.font = '9px Inter, sans-serif'
+        ctx.fillStyle = '#8b9dc3'
+        ctx.textAlign = 'center'
+
+        const labelTop = (items, offsetY) => {
+            const sorted = [...items].sort((a, b) => (b.size || 5) - (a.size || 5))
+            sorted.slice(0, Math.min(5, items.length)).forEach(n => {
+                if (n._x == null) return
+                const name = (n.label || n.id)
+                const short = name.length > 10 ? name.slice(0, 9) + '…' : name
+                ctx.fillText(short, n._x, n._y + offsetY)
             })
-            .attr('x', d => d.x)
-            .attr('y', d => d.y - (d.size || 5) - 6)
-            .attr('font-size', '8px')
-            .attr('fill', '#8b9dc3')
-            .attr('text-anchor', 'middle')
-            .attr('pointer-events', 'none')
-            .attr('opacity', 0)
-            .transition().duration(400).delay(400)
-            .attr('opacity', 0.8)
+        }
+        labelTop(birds, -16)
+        labelTop(pollinators, -14)
+        labelTop(plants, 18)
 
     }, [foodWeb, year])
 
@@ -167,7 +166,7 @@ export default function FoodWebGraph({ foodWeb, year: initialYear }) {
                     </button>
                 ))}
             </div>
-            <svg ref={svgRef} className="food-web-svg" />
+            <canvas ref={canvasRef} className="food-web-svg" style={{ width: '100%', height: 400 }} />
             <div className="food-web-stats">
                 <div className="stat-pill"><span className="stat-dot" style={{ background: '#22c55e' }} /> {stats.plant_count || 0} plants</div>
                 <div className="stat-pill"><span className="stat-dot" style={{ background: '#fbbf24' }} /> {stats.pollinator_count || 0} pollinators</div>
