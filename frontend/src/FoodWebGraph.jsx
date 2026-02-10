@@ -26,8 +26,8 @@ export default function FoodWebGraph({ foodWeb, year: initialYear }) {
         if (!data) return
 
         const svg = d3.select(svgRef.current)
-        const width = svgRef.current.clientWidth || 500
-        const height = 400
+        const width = svgRef.current.clientWidth || 600
+        const height = 420
 
         svg.selectAll('*').remove()
         svg.attr('viewBox', `0 0 ${width} ${height}`)
@@ -54,68 +54,90 @@ export default function FoodWebGraph({ foodWeb, year: initialYear }) {
             bird: '#38bdf8',
         }
 
+        // Trophic layers spread vertically
         const GROUP_Y = {
-            producer: height * 0.75,
+            producer: height * 0.8,
             consumer: height * 0.45,
             top_consumer: height * 0.15,
         }
 
-        // Create force simulation
-        const simulation = d3.forceSimulation(data.nodes)
-            .force('link', d3.forceLink(data.edges).id(d => d.id).distance(60).strength(0.3))
-            .force('charge', d3.forceManyBody().strength(-80))
+        // Deep-clone nodes and edges so D3 doesn't mutate React state
+        const nodes = data.nodes.map(n => ({ ...n }))
+        const edges = data.edges.map(e => ({ ...e }))
+
+        // Create force simulation with strong repulsion
+        const simulation = d3.forceSimulation(nodes)
+            .force('link', d3.forceLink(edges).id(d => d.id).distance(100).strength(0.15))
+            .force('charge', d3.forceManyBody().strength(-200))
             .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('y', d3.forceY(d => GROUP_Y[d.group] || height / 2).strength(0.15))
-            .force('collision', d3.forceCollide().radius(d => (d.size || 6) + 4))
+            .force('y', d3.forceY(d => GROUP_Y[d.group] || height / 2).strength(0.4))
+            .force('x', d3.forceX(width / 2).strength(0.05))
+            .force('collision', d3.forceCollide().radius(d => (d.size || 6) + 12))
 
-        // Links
-        const link = svg.append('g')
-            .selectAll('line')
-            .data(data.edges)
-            .enter().append('line')
-            .attr('stroke', d => d.type === 'pollination' ? 'rgba(34,197,94,0.25)' : 'rgba(56,189,248,0.2)')
-            .attr('stroke-width', d => Math.max(1, (d.strength || 0.5) * 2))
+        // Run simulation synchronously for stability
+        simulation.alpha(1).alphaDecay(0.02)
+        for (let i = 0; i < 200; i++) simulation.tick()
+        simulation.stop()
 
-        // Nodes
-        const node = svg.append('g')
-            .selectAll('circle')
-            .data(data.nodes)
-            .enter().append('circle')
-            .attr('r', d => d.size || 6)
-            .attr('fill', d => TYPE_COLORS[d.type] || '#64748b')
-            .attr('stroke', d => d.conservation === 'declining' || d.conservation === 'vulnerable'
-                ? '#f43f5e' : 'rgba(255,255,255,0.1)')
-            .attr('stroke-width', d => d.conservation === 'declining' ? 2 : 1)
-            .attr('opacity', 0)
-            .transition().duration(600).delay((d, i) => i * 30)
-            .attr('opacity', 0.9)
-
-        // Labels for larger nodes
-        const label = svg.append('g')
-            .selectAll('text')
-            .data(data.nodes.filter(n => (n.size || 6) >= 8))
-            .enter().append('text')
-            .text(d => d.label.length > 15 ? d.label.slice(0, 13) + '…' : d.label)
-            .attr('font-size', '9px')
-            .attr('fill', '#94a3b8')
-            .attr('text-anchor', 'middle')
-            .attr('dy', d => -(d.size || 6) - 4)
-
-        simulation.on('tick', () => {
-            link
-                .attr('x1', d => d.source.x)
-                .attr('y1', d => d.source.y)
-                .attr('x2', d => d.target.x)
-                .attr('y2', d => d.target.y)
-            node
-                .attr('cx', d => d.x = Math.max(10, Math.min(width - 10, d.x)))
-                .attr('cy', d => d.y = Math.max(10, Math.min(height - 10, d.y)))
-            label
-                .attr('x', d => d.x)
-                .attr('y', d => d.y)
+        // Clamp positions
+        nodes.forEach(d => {
+            d.x = Math.max(40, Math.min(width - 40, d.x))
+            d.y = Math.max(20, Math.min(height - 20, d.y))
         })
 
-        return () => simulation.stop()
+        // Draw links with gradient
+        svg.append('g')
+            .selectAll('line')
+            .data(edges)
+            .enter().append('line')
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y)
+            .attr('stroke', d => d.type === 'pollination' ? 'rgba(34,197,94,0.2)' : 'rgba(56,189,248,0.15)')
+            .attr('stroke-width', 1)
+            .attr('opacity', 0)
+            .transition().duration(400)
+            .attr('opacity', 1)
+
+        // Draw nodes
+        svg.append('g')
+            .selectAll('circle')
+            .data(nodes)
+            .enter().append('circle')
+            .attr('cx', d => d.x)
+            .attr('cy', d => d.y)
+            .attr('r', 0)
+            .attr('fill', d => TYPE_COLORS[d.type] || '#64748b')
+            .attr('stroke', d => d.conservation === 'declining' || d.conservation === 'vulnerable'
+                ? '#f43f5e' : 'rgba(255,255,255,0.15)')
+            .attr('stroke-width', d => d.conservation === 'declining' ? 2.5 : 1)
+            .attr('filter', 'drop-shadow(0 0 3px rgba(0,0,0,0.3))')
+            .transition().duration(500).delay((d, i) => i * 20)
+            .attr('r', d => d.size || 5)
+
+        // Labels: only show for top ~10 biggest nodes to avoid clutter
+        const sortedNodes = [...nodes].sort((a, b) => (b.size || 5) - (a.size || 5))
+        const labelNodes = sortedNodes.slice(0, Math.min(10, nodes.length))
+
+        svg.append('g')
+            .selectAll('text')
+            .data(labelNodes)
+            .enter().append('text')
+            .text(d => {
+                const name = d.label || d.id
+                return name.length > 12 ? name.slice(0, 11) + '…' : name
+            })
+            .attr('x', d => d.x)
+            .attr('y', d => d.y - (d.size || 5) - 6)
+            .attr('font-size', '8px')
+            .attr('fill', '#8b9dc3')
+            .attr('text-anchor', 'middle')
+            .attr('pointer-events', 'none')
+            .attr('opacity', 0)
+            .transition().duration(400).delay(400)
+            .attr('opacity', 0.8)
+
     }, [foodWeb, year])
 
     if (!foodWeb) return null

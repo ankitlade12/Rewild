@@ -1,9 +1,38 @@
-import { useState } from 'react'
+import { useState, Component } from 'react'
 import SiteProfileWizard from './SiteProfileWizard'
 import InterventionPanel from './InterventionPanel'
 import Dashboard from './Dashboard'
 import ActionPlan from './ActionPlan'
 import './App.css'
+
+// Error boundary to catch and display runtime errors
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error, info) {
+    console.error('React Error:', error, info)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, color: '#ff6b6b', background: '#1a1a2e', minHeight: '100vh', fontFamily: 'monospace' }}>
+          <h1>⚠️ Rendering Error</h1>
+          <pre style={{ whiteSpace: 'pre-wrap', color: '#ffd93d' }}>{this.state.error?.message}</pre>
+          <pre style={{ whiteSpace: 'pre-wrap', color: '#aaa', fontSize: 12 }}>{this.state.error?.stack}</pre>
+          <button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: '10px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+            Reload
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function App() {
   const [screen, setScreen] = useState('wizard')
@@ -75,4 +104,10 @@ function App() {
   )
 }
 
-export default App
+export default function AppWithErrorBoundary() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  )
+}
