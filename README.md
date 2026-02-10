@@ -16,6 +16,39 @@
 - **Interactive Food Web**: Watch your ecosystem grow from bare soil to a thriving network
 - **Actionable Output**: Printable planting calendars, shopping lists, and month-by-month guides
 
+## High Level Workflow
+
+```mermaid
+flowchart LR
+    subgraph User Journey
+        A["🏠 Enter ZIP Code\n+ Site Details"] --> B["🔬 Choose\nInterventions"]
+        B --> C["📊 Compare\nTrajectories"]
+        C --> D["📋 Get Action\nPlan"]
+    end
+
+    subgraph Backend Pipeline
+        E["ZIP Lookup\nUSDA Zone + EPA Ecoregion"] --> F["Succession Engine\n5-Year Trajectories"]
+        F --> G["Uncertainty Layer\nConfidence Bands"]
+        G --> H["AI Reasoner\nNarrative + Species"]
+        F --> I["Food Web Builder\nTrophic Network"]
+        F --> J["Bloom Calendar\nMonthly Schedule"]
+        G --> K["Action Plan\nPlanting Calendar"]
+    end
+
+    A -.->|/api/lookup| E
+    B -.->|/api/simulate| F
+    D -.->|/api/action-plan| K
+```
+
+### User Flow
+
+| Step | Screen | What Happens |
+|------|--------|-------------|
+| **1** | 🧙 Site Wizard | ZIP → auto-detect USDA zone + ecoregion → enter area, sun, soil, goals |
+| **2** | 🔬 Interventions | Browse scored interventions → select 1-3 to compare |
+| **3** | 📊 Dashboard | Trajectory charts + food web + bloom calendar + AI narrative |
+| **4** | 📋 Action Plan | Month-by-month planting calendar + shopping list + printable PDF |
+
 ## The Problem
 
 When homeowners want to rewild their yard:
