@@ -65,42 +65,192 @@ REWILD is a **consumer ecological scenario engine** that:
 3. **Compares** scenarios with uncertainty bands so you see the range of outcomes
 4. **Generates** personalized planting calendars and action plans
 
-## Architecture
+## Architecture and Technical Overview
+
+### System Architecture
+
+```mermaid
+graph TB
+    subgraph Frontend ["Frontend · React 18 + Vite"]
+        W["SiteProfileWizard"] --> IP["InterventionPanel"]
+        IP --> D["Dashboard"]
+        D --> AP["ActionPlan"]
+        D --> TC["TrajectoryChart · Recharts"]
+        D --> FW["FoodWebGraph · Canvas 2D"]
+        D --> CP["ConfidencePanel"]
+    end
+
+    subgraph APILayer ["API Layer · FastAPI + Uvicorn"]
+        L["/api/lookup/{zip}"]
+        S["/api/simulate"]
+        A["/api/action-plan"]
+    end
+
+    subgraph DataLayer ["Data Layer · Curated Ecological Datasets"]
+        UZ["USDA Hardiness Zones\n3-digit ZIP → Zone"]
+        ER["EPA Ecoregions\nLevel III classification"]
+        NP["Native Plants DB\nSpecies by ecoregion"]
+        PO["Pollinator Registry\nBees, butterflies, birds"]
+        IV["Intervention Library\n8 conversion types"]
+    end
+
+    subgraph SimEngine ["Simulation Engine"]
+        SE["Succession Model\n5-year trajectories"]
+        UE["Uncertainty Engine\nConfidence bands"]
+        BC["Bloom Calendar\nMonthly phenology"]
+        FWB["Food Web Builder\nTrophic network"]
+        APG["Action Plan Generator\nPlanting calendar"]
+    end
+
+    subgraph AILayer ["AI Layer"]
+        GPT["OpenAI GPT-4o-mini\nEcological Narratives"]
+        FB["Template Fallback\nOffline-capable"]
+    end
+
+    Frontend -->|"Vite Proxy /api/*"| APILayer
+    L --> DataLayer
+    S --> SimEngine
+    A --> APG
+    SimEngine --> DataLayer
+    SE --> UE
+    UE --> GPT
+    GPT -.->|"API failure"| FB
+```
+
+### Data Pipeline
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant FE as Frontend
+    participant API as FastAPI
+    participant DL as Data Layer
+    participant SE as Succession Engine
+    participant UE as Uncertainty Engine
+    participant AI as OpenAI GPT-4o
+    participant FW as Food Web Builder
+
+    Note over U,FW: Phase 1 — Site Profile
+    U->>FE: Enter ZIP code
+    FE->>API: GET /api/lookup/75254
+    API->>DL: Query USDA zones + EPA ecoregions
+    DL-->>API: Zone 8a, Great Plains, TX
+    API-->>FE: Site profile data
+    FE-->>U: Display zone, ecoregion, frost dates
+
+    Note over U,FW: Phase 2 — Simulation
+    U->>FE: Select interventions + Run
+    FE->>API: POST /api/simulate
+    par Parallel Processing
+        API->>SE: simulate_trajectory() per intervention
+        SE-->>API: 5-year metric arrays
+        API->>UE: wrap_with_uncertainty()
+        UE-->>API: Optimistic/likely/conservative bands
+        API->>FW: build_food_web()
+        FW-->>API: Nodes + edges per year
+    end
+    API->>AI: get_narrative() with metrics
+    AI-->>API: Ecological narrative + species list
+    API-->>FE: Complete simulation payload
+    FE-->>U: Interactive dashboard
+
+    Note over U,FW: Phase 3 — Action Plan
+    U->>FE: Request action plan
+    FE->>API: POST /api/action-plan
+    API-->>FE: Calendar + shopping list + tasks
+    FE-->>U: Printable action plan
+```
+
+### Technical Deep Dive
+
+#### Succession Model (`succession.py`)
+
+The deterministic succession engine simulates 4 ecological metrics over 5 years:
+
+| Metric | Year 0 | Year 5 | What It Measures |
+|--------|--------|--------|------------------|
+| **Pollinator Diversity** | 0.05–0.15 | 0.45–0.85 | Shannon diversity index of pollinator species |
+| **Carbon Sequestration** | 0.02–0.10 | 0.30–0.70 | Tons CO₂/acre/year relative to mature forest |
+| **Ecosystem Services** | 0.05–0.15 | 0.40–0.75 | Composite: water filtration, erosion control, air quality |
+| **Habitat Complexity** | 0.03–0.10 | 0.35–0.80 | Structural diversity: canopy layers, ground cover, deadwood |
+
+Trajectories are modulated by:
+- **Ecoregion multipliers** — Great Plains grasslands recover faster than Northeast forests
+- **USDA zone factors** — Growing season length affects establishment rates
+- **Site conditions** — Sun exposure and soil type modify growth curves
+- **Intervention type** — Each of the 8 interventions has unique base curves
+
+#### Uncertainty Propagation (`uncertainty.py`)
+
+Every metric value is wrapped with confidence bands:
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                  FRONTEND (React + Vite)                  │
-│                                                          │
-│  SiteProfileWizard → InterventionPanel → Dashboard       │
-│  TrajectoryChart (Recharts) │ FoodWebGraph (Canvas)      │
-│  ConfidencePanel │ BloomCalendar │ ActionPlan             │
-└──────────────────────┬───────────────────────────────────┘
-                       │ /api/* (Vite proxy)
-┌──────────────────────▼───────────────────────────────────┐
-│                  BACKEND (FastAPI + Uvicorn)              │
-│                                                          │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
-│  │ Data Layer   │  │ Engine Layer │  │ AI Layer       │  │
-│  │ ─────────── │  │ ──────────── │  │ ────────────── │  │
-│  │ USDA Zones   │  │ Succession   │  │ OpenAI GPT-4o  │  │
-│  │ EPA Ecoregn  │  │ Bloom Cal    │  │ Fallback narr  │  │
-│  │ Native Plant │  │ Food Web     │  │                │  │
-│  │ Pollinators  │  │ Uncertainty  │  │                │  │
-│  │ Interventns  │  │ Action Plan  │  │                │  │
-│  └─────────────┘  └──────────────┘  └────────────────┘  │
-└──────────────────────────────────────────────────────────┘
+                    ┌─ Optimistic (base × 1.25)
+                    │
+  ══════════════════╪══════════════════  ← Likely (base value)
+                    │
+                    └─ Conservative (base × 0.75)
+
+  Confidence: 85% (Year 1) → 60% (Year 5)
+  Band width widens with time, narrows with more site data
 ```
+
+**Uncertainty reducers** — actionable suggestions that narrow the bands:
+- "Add a soil test to narrow carbon predictions by ~20%"
+- "Confirm sun hours to improve pollinator diversity estimates"
+- "Report first-year observations to calibrate Year 2+ projections"
+
+#### Food Web Builder (`interactions.py`)
+
+Generates a year-by-year trophic network with 3 levels:
+
+| Level | Examples | Source |
+|-------|----------|--------|
+| **Top Consumers** | Meadowlark, Chickadee, Goldfinch | Bird species for ecoregion |
+| **Consumers** | Monarch, Bumblebee, Swallowtail | Pollinator registry |
+| **Producers** | Coneflower, Milkweed, Bluestem | Native plant database |
+
+- Network grows from ~5 nodes (Year 1) to ~38 nodes (Year 5)
+- Edges represent feeding/pollination relationships
+- Conservation status highlighted (declining species get red borders)
+
+#### AI Narrative Engine (`claude_reasoner.py`)
+
+Two-tier AI system with graceful degradation:
+
+| Tier | Provider | When Used | Response Time |
+|------|----------|-----------|---------------|
+| **Primary** | OpenAI GPT-4o-mini | API key configured | ~2 seconds |
+| **Fallback** | Template engine | No key / API failure | Instant |
+
+The AI generates:
+- **Narrative** — 2-3 paragraph ecological story explaining outcomes
+- **Species recommendations** — Top 5 native species with rationale
+- **Key insight** — One surprising ecological outcome
+
+#### Action Plan Generator (`action_plan.py`)
+
+Produces frost-date-aware planting calendars:
+
+| Component | Details |
+|-----------|---------||
+| **Planting Calendar** | 12 months × species, tied to last/first frost dates |
+| **Prep Tasks** | 8-week site preparation timeline |
+| **Shopping List** | Species × quantity, calculated from area + density |
+| **Maintenance** | Seasonal checklists for year-round care |
+| **Mistakes to Avoid** | Top 10 common errors with ecological reasoning |
 
 ## Tech Stack
 
 | Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | React 18 + Vite | 4-screen wizard → dashboard flow |
-| **Charts** | Recharts | Trajectory timelines with confidence bands |
-| **Visualization** | Canvas 2D | Animated food web network |
-| **Backend** | FastAPI + Python | REST API and simulation engine |
+|-------|-----------|--------|
+| **Frontend** | React 18 + Vite 7 | 4-screen wizard → dashboard flow |
+| **Charts** | Recharts 2 | Trajectory timelines with confidence band areas |
+| **Visualization** | Canvas 2D API | Hierarchical food web with animated year progression |
+| **Backend** | FastAPI + Uvicorn | Async REST API and simulation orchestration |
 | **AI** | OpenAI GPT-4o-mini | Ecological narratives + species recommendations |
-| **Data** | Curated JSON datasets | USDA zones, EPA ecoregions, native plants, pollinators |
+| **Data** | Curated Python datasets | USDA zones, EPA ecoregions, native plants, pollinators |
+| **Package Mgmt** | uv (backend) · npm (frontend) | Fast, reliable dependency management |
 
 ## Features
 
