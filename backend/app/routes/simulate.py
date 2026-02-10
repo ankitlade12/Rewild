@@ -79,3 +79,25 @@ async def run_simulation(req: SimulationRequest):
         "scenario_count": len(scenarios),
         "scenarios": scenarios,
     }
+
+
+class ActionPlanRequest(BaseModel):
+    zip_code: str
+    intervention: str
+    area_sqft: int = 500
+    sun: str = "full"
+    soil: str = "well_drained"
+
+
+@router.post("/action-plan")
+async def get_action_plan(req: ActionPlanRequest):
+    """Generate a detailed action plan with planting calendar."""
+    from app.engine.action_plan import generate_action_plan
+    plan = generate_action_plan(
+        zip_code=req.zip_code,
+        intervention=req.intervention,
+        area_sqft=req.area_sqft,
+        sun=req.sun,
+        soil=req.soil,
+    )
+    return plan

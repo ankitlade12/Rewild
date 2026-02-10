@@ -2,11 +2,13 @@ import { useState } from 'react'
 import SiteProfileWizard from './SiteProfileWizard'
 import InterventionPanel from './InterventionPanel'
 import Dashboard from './Dashboard'
+import ActionPlan from './ActionPlan'
 import './App.css'
 
 function App() {
   const [screen, setScreen] = useState('wizard')
   const [profile, setProfile] = useState(null)
+  const [actionIntervention, setActionIntervention] = useState(null)
 
   const handleWizardComplete = (profileData) => {
     setProfile(profileData)
@@ -18,12 +20,19 @@ function App() {
     setScreen('dashboard')
   }
 
+  const handleGetActionPlan = (intervention) => {
+    setActionIntervention(intervention)
+    setScreen('actionplan')
+  }
+
   const handleBack = (target) => {
     if (target === 'wizard') {
       setScreen('wizard')
       setProfile(null)
     } else if (target === 'interventions') {
       setScreen('interventions')
+    } else if (target === 'dashboard') {
+      setScreen('dashboard')
     }
   }
 
@@ -51,6 +60,14 @@ function App() {
           <Dashboard
             profile={profile}
             onBack={() => handleBack('interventions')}
+            onGetActionPlan={handleGetActionPlan}
+          />
+        )}
+        {screen === 'actionplan' && profile && actionIntervention && (
+          <ActionPlan
+            profile={profile}
+            intervention={actionIntervention}
+            onBack={() => handleBack('dashboard')}
           />
         )}
       </main>

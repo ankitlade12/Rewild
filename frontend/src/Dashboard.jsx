@@ -5,7 +5,7 @@ import ConfidencePanel from './ConfidencePanel'
 
 const API = '/api'
 
-export default function Dashboard({ profile, onBack }) {
+export default function Dashboard({ profile, onBack, onGetActionPlan }) {
     const [scenarios, setScenarios] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -173,6 +173,20 @@ export default function Dashboard({ profile, onBack }) {
                             )}
                         </div>
                     )}
+
+                    {/* Action Plan CTA */}
+                    <div className="action-cta glass glow-border animate-in" style={{ animationDelay: '300ms' }}>
+                        <div className="cta-content">
+                            <h3>📋 Ready to Start?</h3>
+                            <p>Get a personalized planting calendar, shopping list, and step-by-step guide.</p>
+                        </div>
+                        <button
+                            className="btn-primary btn-lg"
+                            onClick={() => onGetActionPlan && onGetActionPlan(activeScenario.intervention)}
+                        >
+                            Get Your Action Plan →
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
