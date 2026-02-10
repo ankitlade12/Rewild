@@ -1,5 +1,7 @@
-# GSD planning
+# Agent/tooling
 .gsd/
+.agent/
+.gemini/
 
 # Dependencies
 node_modules/
