@@ -10,11 +10,14 @@ const TYPE_COLORS = {
 export default function ActionPlan({ profile, intervention, onBack }) {
     const [plan, setPlan] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
     const [activeTab, setActiveTab] = useState('calendar')
     const printRef = useRef()
 
     useEffect(() => {
         const load = async () => {
+            setLoading(true)
+            setError(null)
             try {
                 const res = await fetch(`${API}/action-plan`, {
                     method: 'POST',
@@ -27,10 +30,15 @@ export default function ActionPlan({ profile, intervention, onBack }) {
                         soil: profile.soil_type,
                     }),
                 })
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}))
+                    throw new Error(body.detail || 'Failed to generate action plan')
+                }
                 const data = await res.json()
                 setPlan(data)
             } catch (err) {
                 console.error('Failed to load action plan:', err)
+                setError(err?.message || 'Could not generate action plan')
             }
             setLoading(false)
         }
@@ -41,6 +49,7 @@ export default function ActionPlan({ profile, intervention, onBack }) {
         const printContent = printRef.current
         if (!printContent) return
         const w = window.open('', '_blank')
+        if (!w) return
         w.document.write(`
       <html><head><title>REWILD Planting Calendar — ${intervention.replace(/_/g, ' ')}</title>
       <style>
@@ -84,6 +93,16 @@ export default function ActionPlan({ profile, intervention, onBack }) {
                 <div className="loading-spinner" />
                 <h2>Generating Your Action Plan</h2>
                 <p>Building a personalized planting calendar...</p>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="error-screen animate-fade">
+                <h2>⚠️ Action Plan Error</h2>
+                <p>{error}</p>
+                <button className="btn-primary" onClick={onBack}>← Back</button>
             </div>
         )
     }

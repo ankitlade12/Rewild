@@ -1,7 +1,6 @@
 """Food web interaction graph builder for REWILD scenario engine."""
 from app.data.native_plants import get_native_plants
 from app.data.pollinators import get_pollinators
-import math
 
 
 # Bird guilds attracted by different habitat features
@@ -57,7 +56,10 @@ def build_food_web(
         else:
             plant_frac = min(1.0, 0.08 + t * 0.75)
         
-        n_plants = max(1, int(len(plants) * plant_frac))
+        if plants:
+            n_plants = max(1, int(len(plants) * plant_frac))
+        else:
+            n_plants = 0
         active_plants = plants[:n_plants]
         
         nodes = []
@@ -80,37 +82,42 @@ def build_food_web(
         
         # Add pollinator nodes (attracted by current plants)
         active_plant_names = {p["common_name"].lower() for p in active_plants}
-        for pol in polls:
+        for pol_idx, pol in enumerate(polls):
             # Check if any of this pollinator's food plants are present
             overlap = [pv for pv in pol["plants_visited"] if any(pv.lower() in pn for pn in active_plant_names)]
-            # Also check based on year (some arrive later)
-            arrival_threshold = 0.1 + (0.15 * year)
-            
-            if overlap or (year >= 2 and plant_frac > 0.3):
-                polid = f"poll_{pol['name'].replace(' ', '_').lower()}"
-                if polid not in node_ids:
-                    nodes.append({
-                        "id": polid,
-                        "label": pol["name"],
-                        "type": pol["type"],
-                        "group": "consumer",
-                        "conservation": pol["conservation_status"],
-                        "size": 10 if pol["conservation_status"] != "stable" else 6,
-                    })
-                    node_ids.add(polid)
-                    
-                    # Add edges from plants to this pollinator
-                    for pv in overlap[:3]:  # Limit edges per pollinator
-                        for p in active_plants:
-                            if pv.lower() in p["common_name"].lower():
-                                pid = f"plant_{p['common_name'].replace(' ', '_').lower()}"
-                                edges.append({
-                                    "source": pid,
-                                    "target": polid,
-                                    "type": "pollination",
-                                    "strength": 0.5 + (0.1 * year),
-                                })
-                                break
+            if not overlap:
+                continue
+
+            # Gradual colonization: larger/more mature plant communities support more pollinator species.
+            rank = pol_idx / max(len(polls) - 1, 1)
+            colonization_gate = min(1.0, plant_frac + (year * 0.05))
+            if rank > colonization_gate:
+                continue
+
+            polid = f"poll_{pol['name'].replace(' ', '_').lower()}"
+            if polid not in node_ids:
+                nodes.append({
+                    "id": polid,
+                    "label": pol["name"],
+                    "type": pol["type"],
+                    "group": "consumer",
+                    "conservation": pol["conservation_status"],
+                    "size": 10 if pol["conservation_status"] != "stable" else 6,
+                })
+                node_ids.add(polid)
+                
+                # Add edges from plants to this pollinator
+                for pv in overlap[:3]:  # Limit edges per pollinator
+                    for p in active_plants:
+                        if pv.lower() in p["common_name"].lower():
+                            pid = f"plant_{p['common_name'].replace(' ', '_').lower()}"
+                            edges.append({
+                                "source": pid,
+                                "target": polid,
+                                "type": "pollination",
+                                "strength": 0.5 + (0.1 * year),
+                            })
+                            break
         
         # Add birds based on food web complexity
         food_web_score = len(edges) / max(len(polls) * 2, 1)

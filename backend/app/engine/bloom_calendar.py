@@ -16,6 +16,16 @@ def generate_bloom_calendar(
     plants = get_native_plants(ecoregion, sun=sun, soil=soil)
     
     calendar: dict[str, list] = {m: [] for m in _MONTHS}
+
+    if not plants:
+        return {
+            "calendar": calendar,
+            "peak_months": [],
+            "total_species": 0,
+            "bloom_gap_months": [],
+            "no_matching_species": True,
+            "note": "No species matched the current site filters for this ecoregion.",
+        }
     
     for plant in plants:
         bloom_nums = plant.get("bloom_month_nums", [])
@@ -46,6 +56,8 @@ def generate_bloom_calendar(
         )[:3],
         "total_species": len(plants),
         "bloom_gap_months": [m for m, ps in calendar.items() if len(ps) == 0],
+        "no_matching_species": False,
+        "note": "",
     }
     
     return summary

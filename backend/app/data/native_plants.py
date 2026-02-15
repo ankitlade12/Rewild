@@ -217,6 +217,41 @@ _SOIL_MAP = {"W": "Well-drained", "C": "Clay-heavy", "S": "Sandy", "A": "Any"}
 _MONTHS = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
 
+def _normalize_sun_filter(sun: str) -> str | None:
+    key = sun.strip().lower().replace("-", "_").replace(" ", "_")
+    mapping = {
+        "full": "F",
+        "full_sun": "F",
+        "partial": "P",
+        "partial_shade": "P",
+        "shade": "S",
+        "full_shade": "S",
+    }
+    if key in mapping:
+        return mapping[key]
+
+    first = sun[:1].upper()
+    return first if first in {"F", "P", "S"} else None
+
+
+def _normalize_soil_filter(soil: str) -> str | None:
+    key = soil.strip().lower().replace("-", "_").replace(" ", "_")
+    mapping = {
+        "well_drained": "W",
+        "welldrained": "W",
+        "clay": "C",
+        "clay_heavy": "C",
+        "sandy": "S",
+        "any": "A",
+        "unknown": None,
+    }
+    if key in mapping:
+        return mapping[key]
+
+    first = soil[:1].upper()
+    return first if first in {"W", "C", "S", "A"} else None
+
+
 def _expand(entry: tuple) -> dict:
     common, sci, blooms, ht, sun, soil, val, polls = entry
     return {
@@ -239,14 +274,18 @@ def get_native_plants(
 ) -> list[dict]:
     """Get native plants for an ecoregion, optionally filtered."""
     raw = _P.get(ecoregion, [])
-    plants = [_expand(p) for p in raw]
+
     if sun:
-        sun_key = {"full": "F", "partial": "P", "shade": "S"}.get(sun.lower(), sun[0].upper())
-        plants = [p for p in plants if sun_key in p["sun_requirement"][0]]
+        sun_key = _normalize_sun_filter(sun)
+        if sun_key:
+            raw = [p for p in raw if p[4] == sun_key]
+
     if soil:
-        soil_key = {"well-drained": "W", "clay": "C", "sandy": "S", "any": "A"}.get(soil.lower(), soil[0].upper())
-        plants = [p for p in plants if soil_key in p["soil_preference"][0] or p["soil_preference"] == "Any"]
-    return plants
+        soil_key = _normalize_soil_filter(soil)
+        if soil_key:
+            raw = [p for p in raw if p[5] in {soil_key, "A"}]
+
+    return [_expand(p) for p in raw]
 
 
 def list_supported_ecoregions() -> list[str]:

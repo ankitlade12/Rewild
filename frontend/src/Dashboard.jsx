@@ -31,11 +31,14 @@ export default function Dashboard({ profile, onBack, onGetActionPlan }) {
                         interventions: profile.selectedInterventions,
                     }),
                 })
-                if (!res.ok) throw new Error('Simulation failed')
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}))
+                    throw new Error(body.detail || 'Simulation failed')
+                }
                 const data = await res.json()
                 setScenarios(data.scenarios)
             } catch (err) {
-                setError(err.message)
+                setError(err?.message || 'Simulation failed')
             }
             setLoading(false)
         }
@@ -68,7 +71,15 @@ export default function Dashboard({ profile, onBack, onGetActionPlan }) {
         )
     }
 
-    if (!scenarios?.length) return null
+    if (!scenarios?.length) {
+        return (
+            <div className="error-screen animate-fade">
+                <h2>⚠️ No Scenarios Returned</h2>
+                <p>Try selecting at least one intervention and rerun the simulation.</p>
+                <button className="btn-primary" onClick={onBack}>← Back</button>
+            </div>
+        )
+    }
     const activeScenario = scenarios[activeScenarioIdx]
 
     return (
@@ -166,7 +177,11 @@ export default function Dashboard({ profile, onBack, onGetActionPlan }) {
                                     </div>
                                 ))}
                             </div>
-                            {activeScenario.bloom_calendar.bloom_gap_months?.length > 0 && (
+                            {activeScenario.bloom_calendar.no_matching_species ? (
+                                <p className="bloom-gap">
+                                    ℹ️ No species matched your current sun/soil filters for this ecoregion.
+                                </p>
+                            ) : activeScenario.bloom_calendar.bloom_gap_months?.length > 0 && (
                                 <p className="bloom-gap">
                                     ⚠️ Bloom gap: {activeScenario.bloom_calendar.bloom_gap_months.join(', ')}
                                 </p>

@@ -394,8 +394,8 @@ ZONE_FROST_DATES: dict[str, tuple[str, str]] = {
 # State mapping from zip prefix
 ZIP_TO_STATE: dict[str, str] = {
     **{f"0{i:02d}": s for i, s in [(10, "MA"), (11, "MA"), (12, "MA"), (13, "MA"), (14, "MA"), (15, "MA"), (16, "MA"), (17, "MA"), (18, "MA"), (19, "MA"), (20, "MA"), (21, "MA"), (22, "MA"), (23, "MA"), (24, "MA"), (25, "MA"), (26, "MA"), (27, "MA"), (28, "RI"), (29, "RI")]},
-    **{f"0{i:02d}": "ME" for i in range(30, 40)},
     **{f"0{i:02d}": "NH" for i in range(30, 39)},
+    **{f"0{i:02d}": "ME" for i in range(39, 50)},
     **{f"0{i:02d}": "VT" for i in range(50, 60)},
     **{f"0{i:02d}": "CT" for i in range(60, 70)},
     **{f"0{i:02d}": "NJ" for i in range(70, 80)},

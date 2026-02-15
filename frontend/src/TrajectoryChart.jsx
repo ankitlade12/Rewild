@@ -1,4 +1,5 @@
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { Fragment } from 'react'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line } from 'recharts'
 
 const METRIC_CONFIG = {
     pollinator_diversity_index: { label: 'Pollinator Diversity', color: '#fbbf24', icon: '🐝' },
@@ -7,14 +8,35 @@ const METRIC_CONFIG = {
     ecosystem_services_score: { label: 'Ecosystem Services', color: '#a78bfa', icon: '🌍' },
 }
 
-function CustomTooltip({ active, payload, label }) {
-    if (!active || !payload?.length) return null
+function CustomTooltip({ active, payload, label, scenarios }) {
+    if (!active || !payload?.length || !scenarios?.length) return null
+
+    const row = payload[0]?.payload || {}
+    const points = scenarios.map((s, idx) => {
+        const suffix = scenarios.length > 1 ? `_${idx}` : ''
+        const likely = row[`likely${suffix}`]
+        const conservative = row[`conservative${suffix}`]
+        const optimistic = row[`optimistic${suffix}`]
+        if (likely == null || conservative == null || optimistic == null) return null
+        return {
+            key: s.intervention,
+            name: s.intervention.replace(/_/g, ' '),
+            color: ['#22c55e', '#38bdf8', '#fbbf24', '#a78bfa'][idx],
+            likely,
+            conservative,
+            optimistic,
+        }
+    }).filter(Boolean)
+
+    if (!points.length) return null
+
     return (
         <div className="chart-tooltip glass">
             <strong>Year {label}</strong>
-            {payload.map(p => (
-                <div key={p.dataKey} style={{ color: p.color, fontSize: '0.85rem' }}>
-                    {p.name}: {(p.value * 100).toFixed(0)}%
+            {points.map(point => (
+                <div key={point.key} style={{ color: point.color, fontSize: '0.85rem' }}>
+                    {point.name}: {(point.likely * 100).toFixed(0)}%
+                    {' '}({(point.conservative * 100).toFixed(0)}%-{(point.optimistic * 100).toFixed(0)}%)
                 </div>
             ))}
         </div>
@@ -37,7 +59,7 @@ export default function TrajectoryChart({ scenarios, activeMetric }) {
                 row[`optimistic${suffix}`] = yData.optimistic
                 row[`likely${suffix}`] = yData.likely
                 row[`conservative${suffix}`] = yData.conservative
-                row[`band${suffix}`] = [yData.conservative, yData.optimistic]
+                row[`uncertainty${suffix}`] = Math.max(0, yData.optimistic - yData.conservative)
             }
         })
         return row
@@ -67,28 +89,50 @@ export default function TrajectoryChart({ scenarios, activeMetric }) {
                         tickFormatter={v => `Y${v}`}
                     />
                     <YAxis stroke="#64748b" fontSize={12} domain={[0, 1]} tickFormatter={v => `${(v * 100).toFixed(0)}%`} />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<CustomTooltip scenarios={scenarios} />} />
                     {scenarios.length > 1 && <Legend />}
                     {scenarios.map((s, idx) => {
                         const suffix = scenarios.length > 1 ? `_${idx}` : ''
+                        const name = s.intervention.replace(/_/g, ' ')
                         return (
-                            <Area
-                                key={idx}
-                                type="monotone"
-                                dataKey={`likely${suffix}`}
-                                stroke={COLORS[idx]}
-                                fill={`url(#grad_${idx})`}
-                                strokeWidth={2.5}
-                                name={s.intervention.replace(/_/g, ' ')}
-                                dot={{ r: 3, fill: COLORS[idx] }}
-                                activeDot={{ r: 5, stroke: COLORS[idx], strokeWidth: 2, fill: '#0a0f1a' }}
-                            />
+                            <Fragment key={idx}>
+                                <Area
+                                    key={`baseline_${idx}`}
+                                    type="monotone"
+                                    dataKey={`conservative${suffix}`}
+                                    stackId={`band_${idx}`}
+                                    stroke="none"
+                                    fill="transparent"
+                                    legendType="none"
+                                    isAnimationActive={false}
+                                />
+                                <Area
+                                    key={`band_${idx}`}
+                                    type="monotone"
+                                    dataKey={`uncertainty${suffix}`}
+                                    stackId={`band_${idx}`}
+                                    stroke="none"
+                                    fill={COLORS[idx]}
+                                    fillOpacity={0.14}
+                                    name={`${name} range`}
+                                />
+                                <Line
+                                    key={`likely_${idx}`}
+                                    type="monotone"
+                                    dataKey={`likely${suffix}`}
+                                    stroke={COLORS[idx]}
+                                    strokeWidth={2.5}
+                                    name={`${name} likely`}
+                                    dot={{ r: 3, fill: COLORS[idx] }}
+                                    activeDot={{ r: 5, stroke: COLORS[idx], strokeWidth: 2, fill: '#0a0f1a' }}
+                                />
+                            </Fragment>
                         )
                     })}
                 </AreaChart>
             </ResponsiveContainer>
             {/* Confidence bands legend */}
-            {scenarios.length > 0 && scenarios[0].timeline[3]?.[metric] && (
+            {scenarios.length === 1 && scenarios[0].timeline[3]?.[metric] && (
                 <div className="confidence-footer">
                     <span className="conf-label">
                         Y3 confidence: {scenarios[0].timeline[3][metric].confidence}%
@@ -97,6 +141,12 @@ export default function TrajectoryChart({ scenarios, activeMetric }) {
                         Range: {(scenarios[0].timeline[3][metric].conservative * 100).toFixed(0)}%
                         – {(scenarios[0].timeline[3][metric].optimistic * 100).toFixed(0)}%
                     </span>
+                </div>
+            )}
+            {scenarios.length > 1 && (
+                <div className="confidence-footer">
+                    <span className="conf-label">Shaded areas show uncertainty bands</span>
+                    <span className="conf-range">Tooltip shows likely value and conservative-optimistic range</span>
                 </div>
             )}
         </div>

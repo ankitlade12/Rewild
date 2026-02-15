@@ -108,38 +108,54 @@ def _build_planting_calendar(plants, last_frost, first_frost, intervention):
     # Parse frost month
     frost_month_map = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
                        "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
-    last_frost_month = frost_month_map.get(last_frost.split()[0], 4)
+    last_frost_label = (last_frost or "").strip().lower()
+    frost_free = last_frost_label.startswith("frost-free")
+    last_frost_month = None if frost_free else frost_month_map.get(last_frost.split()[0], 4)
 
     calendar = {}
     for month_num, month_name in enumerate(_MONTHS, 1):
         tasks = []
 
-        if month_num == last_frost_month - 1:
-            tasks.append({"task": "Start seeds indoors for early bloomers", "type": "seed", "icon": "🌱"})
-        elif month_num == last_frost_month:
-            tasks.append({"task": "Last frost — start hardening off seedlings", "type": "prep", "icon": "❄️"})
-        elif month_num == last_frost_month + 1:
-            # Main planting month
-            early = [p for p in plants if any(b <= 6 for b in p.get("bloom_month_nums", []))]
-            tasks.append({
-                "task": f"Plant early bloomers: {', '.join(p['common_name'] for p in early[:4])}",
-                "type": "plant", "icon": "🌿",
-                "species": [p["common_name"] for p in early[:4]],
-            })
-        elif month_num == last_frost_month + 2:
-            mid = [p for p in plants if any(6 <= b <= 8 for b in p.get("bloom_month_nums", []))]
-            tasks.append({
-                "task": f"Plant summer bloomers: {', '.join(p['common_name'] for p in mid[:4])}",
-                "type": "plant", "icon": "🌸",
-                "species": [p["common_name"] for p in mid[:4]],
-            })
-        elif month_num == last_frost_month + 3:
-            late = [p for p in plants if any(b >= 8 for b in p.get("bloom_month_nums", []))]
-            tasks.append({
-                "task": f"Plant late-season species: {', '.join(p['common_name'] for p in late[:3])}",
-                "type": "plant", "icon": "🌻",
-                "species": [p["common_name"] for p in late[:3]],
-            })
+        if frost_free:
+            if month_num in [1, 2]:
+                tasks.append({
+                    "task": "Frost-free climate: primary planting window for establishing natives",
+                    "type": "plant",
+                    "icon": "🌿",
+                })
+            elif month_num in [9, 10]:
+                tasks.append({
+                    "task": "Frost-free climate: secondary planting window for cool-season establishment",
+                    "type": "plant",
+                    "icon": "🌱",
+                })
+        else:
+            if month_num == last_frost_month - 1:
+                tasks.append({"task": "Start seeds indoors for early bloomers", "type": "seed", "icon": "🌱"})
+            elif month_num == last_frost_month:
+                tasks.append({"task": "Last frost — start hardening off seedlings", "type": "prep", "icon": "❄️"})
+            elif month_num == last_frost_month + 1:
+                # Main planting month
+                early = [p for p in plants if any(b <= 6 for b in p.get("bloom_month_nums", []))]
+                tasks.append({
+                    "task": f"Plant early bloomers: {', '.join(p['common_name'] for p in early[:4])}",
+                    "type": "plant", "icon": "🌿",
+                    "species": [p["common_name"] for p in early[:4]],
+                })
+            elif month_num == last_frost_month + 2:
+                mid = [p for p in plants if any(6 <= b <= 8 for b in p.get("bloom_month_nums", []))]
+                tasks.append({
+                    "task": f"Plant summer bloomers: {', '.join(p['common_name'] for p in mid[:4])}",
+                    "type": "plant", "icon": "🌸",
+                    "species": [p["common_name"] for p in mid[:4]],
+                })
+            elif month_num == last_frost_month + 3:
+                late = [p for p in plants if any(b >= 8 for b in p.get("bloom_month_nums", []))]
+                tasks.append({
+                    "task": f"Plant late-season species: {', '.join(p['common_name'] for p in late[:3])}",
+                    "type": "plant", "icon": "🌻",
+                    "species": [p["common_name"] for p in late[:3]],
+                })
 
         if 5 <= month_num <= 9:
             tasks.append({"task": "Water new plantings if no rain for 7+ days", "type": "care", "icon": "💧"})

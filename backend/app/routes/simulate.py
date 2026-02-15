@@ -34,6 +34,9 @@ async def run_simulation(req: SimulationRequest):
     ecoregion = eco.get("ecoregion", "Eastern Temperate Forests")
     
     scenarios = []
+    narrative_inputs = []
+    narrative_tasks = []
+
     for intervention in req.interventions:
         # 1. Deterministic succession
         trajectory = simulate_trajectory(zip_code, intervention, area, state, sun, soil)
@@ -56,23 +59,34 @@ async def run_simulation(req: SimulationRequest):
             elif k != "year":
                 y3_metrics[k] = v
         
-        narrative = await get_narrative(
-            ecoregion=ecoregion,
-            intervention=intervention,
-            metrics=y3_metrics,
-            site_info={"zip": zip_code, "area": area, "sun": sun, "soil": soil},
-        )
-        
+        input_payload = {
+            "ecoregion": ecoregion,
+            "intervention": intervention,
+            "metrics": y3_metrics,
+            "site_info": {"zip": zip_code, "area": area, "sun": sun, "soil": soil},
+        }
+        narrative_inputs.append(input_payload)
+        narrative_tasks.append(get_narrative(**input_payload))
+
         scenarios.append({
             "intervention": intervention,
             "timeline": trajectory["years"],
             "uncertainty_reducers": trajectory.get("uncertainty_reducers", []),
             "bloom_calendar": bloom,
             "food_web": {int(k): v for k, v in food_web.items()},
-            "narrative": narrative,
+            "narrative": None,
             "zone": trajectory.get("zone"),
             "ecoregion": ecoregion,
         })
+
+    # Run narrative calls concurrently to reduce response time for multi-scenario comparisons.
+    narratives = await asyncio.gather(*narrative_tasks, return_exceptions=True)
+    for idx, result in enumerate(narratives):
+        if isinstance(result, Exception):
+            fallback = await get_narrative(**narrative_inputs[idx], use_openai=False)
+            scenarios[idx]["narrative"] = fallback
+        else:
+            scenarios[idx]["narrative"] = result
     
     return {
         "site": sp,

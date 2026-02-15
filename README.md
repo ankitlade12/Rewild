@@ -1,7 +1,7 @@
 # 🌿 REWILD — Ecological Scenario Engine for Micro-Habitats
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![React 18](https://img.shields.io/badge/React-18-blue.svg)](https://react.dev/)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![React 19](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -10,7 +10,7 @@
 ## Quick Highlights
 
 - **Scenario Comparison**: Compare native meadow vs rain garden vs shrub border side-by-side
-- **5-Year Trajectories**: Pollinator diversity, carbon sequestration, ecosystem services, habitat complexity
+- **5-Year Trajectories**: Pollinator diversity, bird activity, food-web complexity, ecosystem services
 - **Uncertainty-First**: Every projection shows optimistic / likely / conservative bands with confidence scores
 - **AI-Powered Narratives**: OpenAI explains ecological outcomes and recommends species
 - **Interactive Food Web**: Watch your ecosystem grow from bare soil to a thriving network
@@ -71,7 +71,7 @@ REWILD is a **consumer ecological scenario engine** that:
 
 ```mermaid
 graph TB
-    subgraph Frontend ["Frontend · React 18 + Vite"]
+    subgraph Frontend ["Frontend · React 19 + Vite"]
         W["SiteProfileWizard"] --> IP["InterventionPanel"]
         IP --> D["Dashboard"]
         D --> AP["ActionPlan"]
@@ -170,9 +170,9 @@ The deterministic succession engine simulates 4 ecological metrics over 5 years:
 | Metric | Year 0 | Year 5 | What It Measures |
 |--------|--------|--------|------------------|
 | **Pollinator Diversity** | 0.05–0.15 | 0.45–0.85 | Shannon diversity index of pollinator species |
-| **Carbon Sequestration** | 0.02–0.10 | 0.30–0.70 | Tons CO₂/acre/year relative to mature forest |
+| **Bird Activity** | 0.05–0.15 | 0.30–0.60 | Relative bird visitation and habitat-use potential |
+| **Food-Web Complexity** | 0.03–0.10 | 0.35–0.80 | Relative trophic-network richness and connectivity |
 | **Ecosystem Services** | 0.05–0.15 | 0.40–0.75 | Composite: water filtration, erosion control, air quality |
-| **Habitat Complexity** | 0.03–0.10 | 0.35–0.80 | Structural diversity: canopy layers, ground cover, deadwood |
 
 Trajectories are modulated by:
 - **Ecoregion multipliers** — Great Plains grasslands recover faster than Northeast forests
@@ -196,7 +196,7 @@ Every metric value is wrapped with confidence bands:
 ```
 
 **Uncertainty reducers** — actionable suggestions that narrow the bands:
-- "Add a soil test to narrow carbon predictions by ~20%"
+- "Add a soil test to narrow ecosystem service predictions by ~15%"
 - "Confirm sun hours to improve pollinator diversity estimates"
 - "Report first-year observations to calibrate Year 2+ projections"
 
@@ -244,8 +244,8 @@ Produces frost-date-aware planting calendars:
 
 | Layer | Technology | Purpose |
 |-------|-----------|--------|
-| **Frontend** | React 18 + Vite 7 | 4-screen wizard → dashboard flow |
-| **Charts** | Recharts 2 | Trajectory timelines with confidence band areas |
+| **Frontend** | React 19 + Vite 7 | 4-screen wizard → dashboard flow |
+| **Charts** | Recharts 3 | Trajectory timelines with confidence band areas |
 | **Visualization** | Canvas 2D API | Hierarchical food web with animated year progression |
 | **Backend** | FastAPI + Uvicorn | Async REST API and simulation orchestration |
 | **AI** | OpenAI GPT-4o-mini | Ecological narratives + species recommendations |
@@ -268,7 +268,7 @@ Produces frost-date-aware planting calendars:
 ### 📊 Trajectory Dashboard
 - **Overlay mode**: Compare all scenarios on one chart
 - **Side-by-side mode**: Individual charts per intervention
-- **Metric tabs**: Pollinator diversity, carbon sequestration, ecosystem services, habitat complexity
+- **Metric tabs**: Pollinator diversity, bird activity, food-web complexity, ecosystem services
 - **Food web animation**: Play 5-year growth from bare soil to complex ecosystem
 
 ### 📋 Action Plan
@@ -283,7 +283,7 @@ Produces frost-date-aware planting calendars:
 
 ### Prerequisites
 
-- Python 3.11+ with [uv](https://docs.astral.sh/uv/)
+- Python 3.13+ with [uv](https://docs.astral.sh/uv/)
 - Node.js 20+
 - OpenAI API key (optional — works without it via fallback narratives)
 

@@ -37,7 +37,7 @@ export default function FoodWebGraph({ foodWeb, year: initialYear }) {
             ctx.fillStyle = '#64748b'
             ctx.font = '14px Inter, sans-serif'
             ctx.textAlign = 'center'
-            ctx.fillText('Year 0: Starting point — no established food web yet', w / 2, h / 2)
+            ctx.fillText(`Year ${year}: No supported food-web species for current site filters`, w / 2, h / 2)
             return
         }
 

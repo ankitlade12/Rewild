@@ -15,15 +15,23 @@ export default function InterventionPanel({ profile, onBack, onRunSimulation }) 
     const [plants, setPlants] = useState([])
     const [pollinators, setPollinators] = useState([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
 
     useEffect(() => {
         const load = async () => {
+            setLoading(true)
+            setError(null)
             try {
                 const [intRes, plantRes, pollRes] = await Promise.all([
                     fetch(`${API}/interventions`),
                     fetch(`${API}/plants/${encodeURIComponent(profile.locationData.ecoregion)}`),
                     fetch(`${API}/pollinators/${encodeURIComponent(profile.locationData.ecoregion)}`),
                 ])
+
+                if (!intRes.ok || !plantRes.ok || !pollRes.ok) {
+                    throw new Error('Failed to load intervention data for this ecoregion')
+                }
+
                 const intData = await intRes.json()
                 const plantData = await plantRes.json()
                 const pollData = await pollRes.json()
@@ -32,6 +40,7 @@ export default function InterventionPanel({ profile, onBack, onRunSimulation }) 
                 setPollinators(pollData.pollinators || [])
             } catch (err) {
                 console.error('Failed to load data:', err)
+                setError(err?.message || 'Could not load data')
             }
             setLoading(false)
         }
@@ -46,16 +55,21 @@ export default function InterventionPanel({ profile, onBack, onRunSimulation }) 
 
     const selectedInterventions = interventions.filter(i => selected.includes(i.id))
 
-    // Compute supported pollinators for selected interventions
-    const relevantPollinators = pollinators.filter(p =>
-        p.conservation_status !== 'stable' || selected.length === 0
-    )
-
     if (loading) {
         return (
             <div className="loading-screen animate-fade">
                 <div className="loading-spinner" />
                 <p>Loading ecological data for <strong>{profile.locationData.ecoregion}</strong>...</p>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="error-screen animate-fade">
+                <h2>⚠️ Data Load Error</h2>
+                <p>{error}</p>
+                <button className="btn-primary" onClick={onBack}>← Back</button>
             </div>
         )
     }
