@@ -1,4 +1,16 @@
-"""Food web interaction graph builder for REWILD scenario engine."""
+"""Food web interaction graph builder for REWILD scenario engine.
+
+Provides:
+- Year-by-year food web graph (plants → pollinators → birds) for D3
+  force-directed visualisation.
+- **Shannon-Wiener diversity index** (H') computed from species
+  abundances within functional groups.
+- **Connectance** corrected for directed-graph topology.
+"""
+
+from __future__ import annotations
+
+import math
 from app.data.native_plants import get_native_plants
 from app.data.pollinators import get_pollinators
 
@@ -26,6 +38,59 @@ _BIRD_GUILDS = {
         "min_food_web": 0.4,
     },
 }
+
+
+def compute_shannon_wiener(counts: list[int]) -> float:
+    """Compute the Shannon-Wiener diversity index H'.
+
+    .. math::
+
+        H' = -\\sum_{i=1}^{S} p_i \\, \\ln(p_i)
+
+    where :math:`S` is the number of species and
+    :math:`p_i = n_i / N` is the proportional abundance of species *i*.
+
+    A higher value indicates greater diversity.  A community with one
+    species returns 0.0.  A community with ``S`` equally-abundant species
+    returns ``ln(S)``.
+
+    Args:
+        counts: List of individual counts (or proxy weights) per species.
+
+    Returns:
+        H' rounded to 3 decimal places; 0.0 when ≤ 1 species.
+    """
+    total = sum(counts)
+    if total == 0 or len(counts) <= 1:
+        return 0.0
+
+    h = 0.0
+    for n in counts:
+        if n > 0:
+            p = n / total
+            h -= p * math.log(p)
+    return round(h, 3)
+
+
+def compute_evenness(h_prime: float, species_count: int) -> float:
+    """Compute Pielou's evenness index J' = H' / ln(S).
+
+    Normalises diversity to ``[0, 1]`` where 1.0 means all species are
+    equally abundant.
+
+    Args:
+        h_prime: Shannon-Wiener index value.
+        species_count: Number of species (S).
+
+    Returns:
+        J' rounded to 3 decimals; 0.0 when S ≤ 1.
+    """
+    if species_count <= 1:
+        return 0.0
+    max_h = math.log(species_count)
+    if max_h == 0:
+        return 0.0
+    return round(h_prime / max_h, 3)
 
 
 def build_food_web(
@@ -148,22 +213,49 @@ def build_food_web(
                                     "strength": 0.3 + (0.1 * year),
                                 })
         
-        # Stats
+        # Stats — diversity indices and corrected connectance
         n_types = len(set(n["type"] for n in nodes))
-        connectance = len(edges) / max(len(nodes) * (len(nodes) - 1) / 2, 1) if nodes else 0
-        
+        n_nodes = len(nodes)
+        n_edges = len(edges)
+
+        # Connectance: directed graph → max edges = n*(n-1), not n*(n-1)/2
+        max_directed_edges = n_nodes * (n_nodes - 1) if n_nodes > 1 else 1
+        connectance = n_edges / max_directed_edges if n_nodes > 1 else 0.0
+
+        # Shannon-Wiener over functional groups (proxy abundance = edge count)
+        plant_nodes = [n for n in nodes if n["type"] == "plant"]
+        poll_nodes_all = [n for n in nodes if n["group"] == "consumer"]
+        bird_nodes = [n for n in nodes if n["type"] == "bird"]
+
+        # Per-species abundance proxy: number of edges touching each node
+        edge_ids = set()
+        for e in edges:
+            edge_ids.add(e["source"])
+            edge_ids.add(e["target"])
+
+        species_counts: list[int] = []
+        for n in nodes:
+            count = sum(1 for e in edges
+                        if e["source"] == n["id"] or e["target"] == n["id"])
+            species_counts.append(max(count, 1))  # at least 1 (present)
+
+        h_prime = compute_shannon_wiener(species_counts)
+        evenness = compute_evenness(h_prime, len(nodes))
+
         web[year] = {
             "nodes": nodes,
             "edges": edges,
             "stats": {
-                "total_nodes": len(nodes),
-                "total_edges": len(edges),
+                "total_nodes": n_nodes,
+                "total_edges": n_edges,
                 "trophic_levels": n_types,
                 "connectance": round(connectance, 3),
-                "plant_count": sum(1 for n in nodes if n["type"] == "plant"),
-                "pollinator_count": sum(1 for n in nodes if n["group"] == "consumer"),
-                "bird_count": sum(1 for n in nodes if n["type"] == "bird"),
-            }
+                "plant_count": len(plant_nodes),
+                "pollinator_count": len(poll_nodes_all),
+                "bird_count": len(bird_nodes),
+                "shannon_wiener_index": h_prime,
+                "evenness": evenness,
+            },
         }
     
     return web

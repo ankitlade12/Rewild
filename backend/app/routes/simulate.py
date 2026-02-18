@@ -3,8 +3,8 @@ import asyncio
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.engine.succession import simulate_trajectory
-from app.engine.bloom_calendar import generate_bloom_calendar
+from app.engine.succession import simulate_trajectory, compute_synergy
+from app.engine.bloom_calendar import generate_bloom_calendar, generate_succession_bloom
 from app.engine.interactions import build_food_web
 from app.engine.uncertainty import wrap_trajectory_with_uncertainty
 from app.engine.claude_reasoner import get_narrative
@@ -32,20 +32,28 @@ async def run_simulation(req: SimulationRequest):
     from app.data.ecoregions import get_ecoregion
     eco = get_ecoregion(zip_code)
     ecoregion = eco.get("ecoregion", "Eastern Temperate Forests")
-    
+
+    # Multi-intervention synergy coefficients (per-metric)
+    synergy = compute_synergy(req.interventions)
+
     scenarios = []
     narrative_inputs = []
     narrative_tasks = []
 
     for intervention in req.interventions:
-        # 1. Deterministic succession
-        trajectory = simulate_trajectory(zip_code, intervention, area, state, sun, soil)
+        # 1. Deterministic succession (with synergy)
+        trajectory = simulate_trajectory(
+            zip_code, intervention, area, state, sun, soil, synergy=synergy,
+        )
         
         # 2. Uncertainty bands
         trajectory = wrap_trajectory_with_uncertainty(trajectory, intervention, soil_known)
         
-        # 3. Bloom calendar
+        # 3. Bloom calendar + succession-aware bloom
         bloom = generate_bloom_calendar(ecoregion, sun, soil if soil_known else None)
+        succession_bloom = generate_succession_bloom(
+            ecoregion, sun, soil if soil_known else None,
+        )
         
         # 4. Food web
         food_web = build_food_web(ecoregion, [intervention], sun, soil if soil_known else None)
@@ -73,7 +81,12 @@ async def run_simulation(req: SimulationRequest):
             "timeline": trajectory["years"],
             "uncertainty_reducers": trajectory.get("uncertainty_reducers", []),
             "bloom_calendar": bloom,
+            "succession_bloom": succession_bloom,
             "food_web": {int(k): v for k, v in food_web.items()},
+            "synergy": {
+                "coefficients": synergy,
+                "active_interventions": req.interventions,
+            },
             "narrative": None,
             "zone": trajectory.get("zone"),
             "ecoregion": ecoregion,

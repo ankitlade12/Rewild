@@ -11,6 +11,12 @@
 
 - **Scenario Comparison**: Compare native meadow vs rain garden vs shrub border side-by-side
 - **5-Year Trajectories**: Pollinator diversity, bird activity, food-web complexity, ecosystem services
+- **Logistic Growth Curves**: Ecologically realistic diminishing returns — no metric falsely saturates to 1.0
+- **Multi-Intervention Synergy**: Combining meadow + nesting + structures yields measurable per-metric boosts (up to 62% pollinator synergy)
+- **Soil-Aware Modelling**: Clay boosts rain gardens (+15% services), penalises meadows (−12% pollinators) — 4 soil types × 8 interventions
+- **Bloom Continuity Score**: Shannon-entropy metric quantifying how evenly bloom coverage spans the growing season
+- **Succession-Aware Bloom**: Year-by-year bloom calendars model which species establish first (forbs before shrubs)
+- **Shannon-Wiener Diversity Index**: Real ecological diversity (H') and Pielou evenness (J') computed from the food web
 - **Uncertainty-First**: Every projection shows optimistic / likely / conservative bands with confidence scores
 - **AI-Powered Narratives**: OpenAI explains ecological outcomes and recommends species
 - **Interactive Food Web**: Watch your ecosystem grow from bare soil to a thriving network
@@ -165,7 +171,7 @@ sequenceDiagram
 
 #### Succession Model (`succession.py`)
 
-The deterministic succession engine simulates 4 ecological metrics over 5 years:
+The deterministic succession engine simulates 4 ecological metrics over 5 years using **logistic growth curves**:
 
 | Metric | Year 0 | Year 5 | What It Measures |
 |--------|--------|--------|------------------|
@@ -174,11 +180,55 @@ The deterministic succession engine simulates 4 ecological metrics over 5 years:
 | **Food-Web Complexity** | 0.03–0.10 | 0.35–0.80 | Relative trophic-network richness and connectivity |
 | **Ecosystem Services** | 0.05–0.15 | 0.40–0.75 | Composite: water filtration, erosion control, air quality |
 
-Trajectories are modulated by:
-- **Ecoregion multipliers** — Great Plains grasslands recover faster than Northeast forests
+##### Logistic Scaling (prevents saturation)
+
+Instead of linear `v × modifier` (which overflows past 1.0 and must be clamped), modifiers are applied through a **logistic curve**:
+
+$$v' = \frac{v \cdot m}{v \cdot m + (1 - v)}$$
+
+This naturally compresses near the ceiling — the same way real ecosystems exhibit diminishing returns as they approach carrying capacity. Example: the old model gave `0.75 × 1.25 × 1.3 = 1.22 → clamped to 1.0` (a false "perfect" ecosystem); the new model yields `0.692` — a realistically high but non-saturated score.
+
+##### Per-Metric Modifier Weights
+
+Each ecological metric responds differently to site factors:
+
+| Factor | Pollinator | Bird | Food Web | Services |
+|--------|-----------|------|----------|----------|
+| **Area** | 0.8× | **1.4×** | 1.0× | 1.2× |
+| **Sun** | **1.3×** | 0.8× | 1.0× | 0.9× |
+| **Soil** | 0.9× | 0.7× | 0.8× | **1.4×** |
+
+Birds care more about territory size; pollinators care more about sunlight; ecosystem services care more about soil quality.
+
+##### Soil-Type Cross-Effects
+
+Soil type interacts with each intervention differently across all 4 metrics:
+
+| Soil × Intervention | Impact |
+|---|---|
+| Clay + Rain Garden | +15% services, +10% pollinators (clay retains water → rain gardens excel) |
+| Clay + Native Meadow | −12% pollinators, −15% food web (compacted clay limits root establishment) |
+| Sandy + Rain Garden | −22% services (water drains too fast for rain garden effectiveness) |
+| Sandy + Pollinator Nesting | +5% pollinators (sandy soil is ideal for ground-nesting bees) |
+
+##### Multi-Intervention Synergy
+
+`compute_synergy()` examines all pairwise combinations among selected interventions and multiplies per-metric synergy coefficients:
+
+| Combination | Poll | Bird | Web | Svc |
+|---|---|---|---|---|
+| Meadow + Nesting | **1.25** | 1.05 | 1.18 | 1.08 |
+| Meadow + Structures | 1.10 | **1.20** | 1.15 | 1.12 |
+| Shrub + Structures | 1.08 | **1.22** | 1.15 | 1.10 |
+| Meadow + Nesting + Structures | **1.62** | **1.45** | **1.56** | 1.31 |
+
+18 pairwise synergies are defined. Triple-intervention synergy is the product of all 3 pair coefficients.
+
+Trajectories are additionally modulated by:
+- **Ecoregion multipliers** — Tropical Florida (1.3×) recovers faster than Northern Forests (0.85×)
 - **USDA zone factors** — Growing season length affects establishment rates
-- **Site conditions** — Sun exposure and soil type modify growth curves
-- **Intervention type** — Each of the 8 interventions has unique base curves
+- **Current site state** — Partial gardens (1.25×) have a head start over bare soil (0.85×)
+- **Intervention type** — Each of the 8 interventions has unique 6-year base curves
 
 #### Uncertainty Propagation (`uncertainty.py`)
 
@@ -210,9 +260,24 @@ Generates a year-by-year trophic network with 3 levels:
 | **Consumers** | Monarch, Bumblebee, Swallowtail | Pollinator registry |
 | **Producers** | Coneflower, Milkweed, Bluestem | Native plant database |
 
-- Network grows from ~5 nodes (Year 1) to ~38 nodes (Year 5)
-- Edges represent feeding/pollination relationships
+- Network grows from ~3 nodes (Year 0) to ~34 nodes (Year 5)
+- Edges represent directed feeding/pollination relationships
 - Conservation status highlighted (declining species get red borders)
+
+##### Diversity Indices
+
+Each year's food web includes two standard ecological diversity metrics:
+
+- **Shannon-Wiener Index (H')** — $H' = -\sum p_i \ln(p_i)$ — measures species diversity weighted by abundance. Rises from ~1.0 (Year 0) to ~3.2 (Year 5) for a typical meadow.
+- **Pielou's Evenness (J')** — $J' = H' / \ln(S)$ — normalised to [0, 1], where 1.0 means all species are equally abundant. Typical values: 0.90–0.95.
+- **Directed Connectance** — $C = E / N(N-1)$ — corrected from the old undirected formula. Trophic graphs are inherently directional (plants don't eat pollinators).
+
+| Year | Nodes | Edges | H' | J' | Connectance |
+|------|-------|-------|-----|-----|-------------|
+| Y0 | 3 | 2 | 1.04 | 0.95 | 0.333 |
+| Y1 | 9 | 10 | 2.10 | 0.95 | 0.139 |
+| Y3 | 22 | 31 | 2.82 | 0.91 | 0.067 |
+| Y5 | 34 | 50 | 3.16 | 0.90 | 0.045 |
 
 #### AI Narrative Engine (`claude_reasoner.py`)
 
@@ -260,10 +325,15 @@ Produces frost-date-aware planting calendars:
 - Goal selection: pollinators, birds, water management, carbon, beauty
 
 ### 🔬 Scenario Engine
-- **Deterministic succession model**: 5-year trajectories for 4 key metrics
+- **Logistic succession model**: 5-year trajectories for 4 key metrics with ecologically realistic diminishing returns
+- **Multi-intervention synergy**: Combining interventions yields measurable per-metric boosts (18 pairwise synergies)
+- **Soil-aware modelling**: Clay, sandy, loamy, and well-drained soils interact differently with each intervention
+- **Per-metric sensitivity**: Area helps birds most (1.4×), sun helps pollinators most (1.3×), soil helps services most (1.4×)
 - **Uncertainty propagation**: Confidence bands widen with time, narrow with data
-- **Food web builder**: Plant → pollinator → bird trophic network grows over time
-- **Bloom calendar**: Month-by-month flowering schedule for continuous pollinator support
+- **Food web + diversity**: Plant → pollinator → bird trophic network with Shannon-Wiener H' and Pielou evenness J'
+- **Bloom continuity**: Shannon-entropy score (0–1) measuring how evenly bloom coverage spans the year
+- **Succession-aware bloom**: Year-by-year bloom calendars model forb-before-shrub establishment order
+- **Gap-filling recommendations**: Suggests species to fill months with no bloom coverage
 
 ### 📊 Trajectory Dashboard
 - **Overlay mode**: Compare all scenarios on one chart
@@ -368,9 +438,9 @@ rewild/
 │   │   │   ├── pollinators.py     # Pollinator species data
 │   │   │   └── interventions.py   # Intervention definitions
 │   │   ├── engine/                # Simulation engine
-│   │   │   ├── succession.py      # 5-year trajectory model
-│   │   │   ├── bloom_calendar.py  # Month-by-month bloom schedule
-│   │   │   ├── interactions.py    # Food web graph builder
+│   │   │   ├── succession.py      # Logistic trajectory model + synergy + soil effects
+│   │   │   ├── bloom_calendar.py  # Bloom calendar + continuity score + succession bloom
+│   │   │   ├── interactions.py    # Food web + Shannon-Wiener diversity index
 │   │   │   ├── uncertainty.py     # Confidence bands + reducers
 │   │   │   ├── claude_reasoner.py # OpenAI narrative generator
 │   │   │   └── action_plan.py     # Planting calendar generator
@@ -406,9 +476,14 @@ rewild/
 
 ## Design Decisions
 
+- **Logistic over linear**: Ecological growth naturally exhibits diminishing returns near carrying capacity — the logistic curve models this without artificial clamping
+- **Shannon-Wiener over Simpson's**: H' is more sensitive to rare species — critical for a conservation-focused tool
+- **Directed connectance**: Trophic graphs are inherently directed (plants → pollinators → birds), so `C = E / N(N−1)` is used instead of the undirected formula
+- **Per-metric weights**: Not all metrics respond equally to all factors — area matters most for birds (territory), sun matters most for pollinators (foraging)
+- **Synergy as pairwise products**: Synergy coefficients multiply across pairs, naturally scaling with the number of complementary interventions
 - **Uncertainty-first**: Every metric shows range bands, not point predictions
 - **Offline-capable AI**: Works fully without an API key using template narratives
-- **Ecoregion-aware**: All data is localized to EPA Level III ecoregions
+- **Ecoregion-aware**: All data is localised to EPA Level III ecoregions
 - **Intervention comparison**: Side-by-side comparison is a first-class feature
 - **Printable output**: Action plans designed for printing and taking to the garden
 
