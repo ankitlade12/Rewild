@@ -14,7 +14,8 @@ class EcologyOutputTests(unittest.TestCase):
 
         self.assertEqual(bloom["total_species"], 0)
         self.assertTrue(bloom["no_matching_species"])
-        self.assertEqual(bloom["bloom_gap_months"], [])
+        # When no species match, every month is a gap
+        self.assertEqual(len(bloom["bloom_gap_months"]), 12)
 
     def test_food_web_does_not_add_pollinators_without_supported_plants(self):
         web = build_food_web(
