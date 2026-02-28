@@ -279,6 +279,12 @@ Each year's food web includes two standard ecological diversity metrics:
 | Y3 | 22 | 31 | 2.82 | 0.91 | 0.067 |
 | Y5 | 34 | 50 | 3.16 | 0.90 | 0.045 |
 
+#### Succession-Aware Bloom Engine (`bloom_calendar.py`)
+
+A temporal bloom calendar that evaluates how evenly a garden blooms across 12 months using a normalized Shannon-entropy metric (**Bloom Continuity Score**). 
+
+Because the engine is succession-aware, it models *when* plants establish—fast-growing forbs bloom in Year 1, while slow-growing shrubs and trees don't provide bloom coverage until Year 3+. It also analyzes temporal gaps and automatically recommends specific native species to fill "low-bloom" months.
+
 #### AI Narrative Engine (`claude_reasoner.py`)
 
 Two-tier AI system with graceful degradation:
@@ -486,6 +492,14 @@ rewild/
 - **Ecoregion-aware**: All data is localised to EPA Level III ecoregions
 - **Intervention comparison**: Side-by-side comparison is a first-class feature
 - **Printable output**: Action plans designed for printing and taking to the garden
+- **Stateless & Database-free Architecture**: By cleanly curating and embedding ecological datasets directly into the API layer, the backend is 100% stateless, offering infinite scalability and zero database management.
+
+## 💼 Viability & Target Audience
+
+While REWILD is free for individual homeowners, the underlying engine has clear paths to sustainability:
+* **B2B Licensing for Nurseries**: Garden centers can embed REWILD on their sites to drive hyper-local, ecologically appropriate plant sales.
+* **Municipal & School District Tiers**: Pro dashboards for cities tracking their biodiversity goals across public lands and schools.
+* **NGO Partnerships**: Whitelabeling the tool for conservation groups to power their specific regional rewilding campaigns.
 
 ## License
 
